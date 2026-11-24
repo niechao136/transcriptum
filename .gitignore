@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# 运行时数据（真实录音与转写结果不应入库）
+backend/data/
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# 前端
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# 日志与临时
+*.log
+srv.out.log
+srv.err.log
+probe_tmp.py
+.DS_Store

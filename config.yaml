@@ -1,0 +1,66 @@
+# Transcriptum 默认配置（试点期）
+# 注意：所有 base_url 必须落在 security.allowed_egress_domains 内，否则启动期拒绝。
+
+db_path: ./data/transcriptum.db
+data_dir: ./data
+
+asr:
+  adapter: mock                       # 开发期：mock | mock_openai
+                                      # 目标机：moss（自定义 HTTP 三段式）
+                                      # 通用：openai_audio
+  base_url: http://127.0.0.1:9000
+  api_key_env: ASR_API_KEY
+  model: MOSS-Transcribe-Diarize
+  hotwords_file: null
+  timeout_s: 60
+  custom_http:
+    submit_path: /v1/jobs
+    poll_path: /v1/jobs/{job_id}
+    fetch_path: /v1/jobs/{job_id}/result
+    poll_interval_s: 2
+    max_poll_s: 3600
+    capabilities:
+      has_word_ts: false              # MOSS 真实能力：无字级时间戳
+      has_confidence: false
+      has_speaker: true
+
+diarizer:
+  adapter: moss_inline                # MOSS 内联说话人；无分离能力时改 none
+
+llm:
+  adapter: mock                       # 目标机：openai_compatible
+  base_url: http://127.0.0.1:8000/v1
+  api_key_env: LLM_API_KEY
+  model: Qwen2.5-7B-Instruct
+  json_mode: true
+  timeout_s: 120
+  prompt_version: proofread-v1
+
+diarization:
+  assign_mode: overlap_max
+  ambiguous_margin: 0.15
+  min_overlap_ratio: 0.3
+  on_ambiguous: flag_review
+  switch_overlap_threshold: 0.25
+
+proofread:
+  low_confidence_threshold: 0.6
+  batch_accept_min_confidence: 0.85
+  window_segments: 3
+  prompt_version: proofread-v1
+
+security:
+  allowed_egress_domains:
+    - localhost
+    - 127.0.0.1
+    - "::1"
+    - "*.internal"
+  audio_retention_days: 30
+  encrypt_at_rest: false
+  export_redact: true
+
+queue:
+  max_workers: 1                      # 本地模型显存限制，一次一个 ASR
+  asr_concurrency: 1
+  poll_interval_s: 1
+  max_attempts: 3
