@@ -6,7 +6,24 @@
 
 ---
 
-## 快速开始
+## 🐳 Docker 部署（推荐）
+
+单镜像同时提供 API、Worker 和前端页面（同源，免 CORS），以非 root 运行，内置 ffmpeg：
+
+```bash
+docker build -t transcriptum:0.1.0 .
+cp .env.example .env            # 按需改模型端点与白名单
+docker compose up -d
+# 打开 http://127.0.0.1:8080  ，健康检查 /api/health
+```
+
+- 数据落在命名卷 `transcriptum-data`（SQLite + 音频）；
+- 默认 mock 适配器，无需模型即可跑通全流程；
+- 接真实模型、API/Worker 拆分、运维命令见 **[Docker 部署指南](docs/Docker部署指南.md)**。
+
+---
+
+## 本地开发（不用 Docker）
 
 ```bash
 # 1. 后端依赖

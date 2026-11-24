@@ -44,7 +44,10 @@ def _domain_allowed(host: str, allowed: list[str]) -> bool:
                 return True
         elif host == p:
             return True
-    return _is_private_host(host)
+    # 白名单是唯一授权来源：不再对内网地址无条件放行。
+    # 内置配置已包含 localhost/127.0.0.1/::1；其他主机（含内网 IP）
+    # 必须通过 TRANSCRIPTUM_ALLOWED_EGRESS 或 yaml 显式加白名单。
+    return False
 
 
 def validate_egress(url: str, allowed: list[str], *, what: str) -> None:
@@ -161,8 +164,49 @@ class Config:
         if path and Path(path).exists():
             raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
         cfg = _from_dict(raw)
+        # 环境变量覆盖：容器部署时配置由编排层注入，不必改镜像内文件
+        cfg.apply_env(os.environ)
         cfg.validate()
         return cfg
+
+    def apply_env(self, env: dict[str, str]) -> None:
+        """用 TRANSCRIPTUM_* 环境变量覆盖配置。
+
+        只覆盖显式给出的键，未给出的保持 yaml/默认值。
+        故意不支持任意嵌套：键名是白名单，写错的环境变量会被忽略而不是悄悄生效。
+        """
+        mapping: dict[str, tuple[Any, str, Any]] = {
+            "TRANSCRIPTUM_DB_PATH": (self, "db_path", str),
+            "TRANSCRIPTUM_DATA_DIR": (self, "data_dir", str),
+            "TRANSCRIPTUM_ASR_ADAPTER": (self.asr, "adapter", str),
+            "TRANSCRIPTUM_ASR_BASE_URL": (self.asr, "base_url", str),
+            "TRANSCRIPTUM_ASR_MODEL": (self.asr, "model", str),
+            "TRANSCRIPTUM_ASR_API_KEY_ENV": (self.asr, "api_key_env", str),
+            "TRANSCRIPTUM_ASR_TIMEOUT_S": (self.asr, "timeout_s", float),
+            "TRANSCRIPTUM_LLM_ADAPTER": (self.llm, "adapter", str),
+            "TRANSCRIPTUM_LLM_BASE_URL": (self.llm, "base_url", str),
+            "TRANSCRIPTUM_LLM_MODEL": (self.llm, "model", str),
+            "TRANSCRIPTUM_LLM_API_KEY_ENV": (self.llm, "api_key_env", str),
+            "TRANSCRIPTUM_LLM_JSON_MODE": (self.llm, "json_mode", _as_bool),
+            "TRANSCRIPTUM_LLM_TIMEOUT_S": (self.llm, "timeout_s", float),
+            "TRANSCRIPTUM_DIARIZER_ADAPTER": (self.diarizer, "adapter", str),
+            "TRANSCRIPTUM_AUDIO_RETENTION_DAYS": (self.security, "audio_retention_days", int),
+            "TRANSCRIPTUM_EXPORT_REDACT": (self.security, "export_redact", _as_bool),
+            "TRANSCRIPTUM_LOW_CONFIDENCE": (self.proofread, "low_confidence_threshold", float),
+            "TRANSCRIPTUM_WORKERS": (self.queue, "max_workers", int),
+        }
+        for key, (obj, attr, caster) in mapping.items():
+            if key in env and env[key] != "":
+                try:
+                    setattr(obj, attr, caster(env[key]))
+                except (TypeError, ValueError) as exc:
+                    raise ConfigError(f"环境变量 {key}={env[key]!r} 无法解析：{exc}") from exc
+
+        # 白名单可追加（逗号分隔）：容器里访问宿主机模型服务常用 host.docker.internal
+        extra = env.get("TRANSCRIPTUM_ALLOWED_EGRESS")
+        if extra:
+            hosts = [h.strip() for h in extra.split(",") if h.strip()]
+            self.security.allowed_egress_domains.extend(hosts)
 
     def validate(self) -> None:
         self.diarization.validate()
@@ -196,6 +240,15 @@ class Config:
             p.parent.mkdir(parents=True, exist_ok=True) if p.suffix else p.mkdir(
                 parents=True, exist_ok=True
             )
+
+
+def _as_bool(value: str) -> bool:
+    v = str(value).strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"无法解析为布尔值：{value!r}")
 
 
 def _kwargs(dc, raw: dict[str, Any], section: str):

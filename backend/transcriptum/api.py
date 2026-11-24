@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import tempfile
@@ -290,7 +291,48 @@ def create_app(cfg: Config | None = None, *, start_worker: bool = False) -> Fast
         threading.Thread(target=w.run_forever, daemon=True).start()
         app.state.worker = w
 
+    _mount_frontend(app, cfg)
     return app
+
+
+def _mount_frontend(app: FastAPI, cfg: Config) -> None:
+    """单镜像同源部署：托管构建好的前端（容器内 /app/static）。
+
+    必须在所有 /api 路由注册之后挂载 —— 否则根路径的 catch-all 会吞掉 API。
+    开发期前端跑 Vite dev server，这里找不到目录就静默跳过。
+    """
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    static_dir = Path(os.environ.get("TRANSCRIPTUM_STATIC_DIR", "") or "")
+    if not static_dir.is_absolute() or not static_dir.is_dir():
+        return
+
+    assets = static_dir / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+
+    index = static_dir / "index.html"
+
+    @app.get("/")
+    def _index():
+        if not index.exists():
+            raise HTTPException(404, "前端未构建")
+        return FileResponse(index)
+
+    @app.get("/{full_path:path}")
+    def _spa(full_path: str):
+        # 静态文件优先；其余交给 SPA 路由（前端是单页应用）
+        candidate = (static_dir / full_path).resolve()
+        try:
+            candidate.relative_to(static_dir.resolve())
+        except ValueError:
+            raise HTTPException(404, "非法的静态路径") from None
+        if candidate.is_file():
+            return FileResponse(candidate)
+        if not index.exists():
+            raise HTTPException(404, "前端未构建")
+        return FileResponse(index)
 
 
 _MEDIA_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4",

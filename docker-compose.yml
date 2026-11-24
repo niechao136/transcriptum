@@ -1,0 +1,77 @@
+# Transcriptum —— 单机部署编排
+#
+# 用法：
+#   cp .env.example .env      # 按需改端口与模型端点
+#   docker compose up -d --build
+#   docker compose logs -f
+#
+# 默认使用 mock 适配器，无模型也能跑通全流程；接真实模型见 .env.example。
+
+services:
+  transcriptum:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: transcriptum:0.1.0
+    restart: unless-stopped
+    ports:
+      - "${TRANSCRIPTUM_PORT:-8080}:8080"
+    environment:
+      TRANSCRIPTUM_CONFIG: /app/config.yaml
+      TRANSCRIPTUM_DATA_DIR: /data
+      TRANSCRIPTUM_DB_PATH: /data/transcriptum.db
+      PORT: "8080"
+      # mock 适配器无需模型；接真实模型时覆盖以下变量
+      TRANSCRIPTUM_ASR_ADAPTER: ${TRANSCRIPTUM_ASR_ADAPTER:-mock}
+      TRANSCRIPTUM_ASR_BASE_URL: ${TRANSCRIPTUM_ASR_BASE_URL:-http://host.docker.internal:9000}
+      TRANSCRIPTUM_LLM_ADAPTER: ${TRANSCRIPTUM_LLM_ADAPTER:-mock}
+      TRANSCRIPTUM_LLM_BASE_URL: ${TRANSCRIPTUM_LLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      TRANSCRIPTUM_LLM_MODEL: ${TRANSCRIPTUM_LLM_MODEL:-Qwen2.5-7B-Instruct}
+      ASR_API_KEY: ${ASR_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # 内网模型地址需要加入出网白名单，否则启动期拒绝
+      TRANSCRIPTUM_ALLOWED_EGRESS: ${TRANSCRIPTUM_ALLOWED_EGRESS:-localhost,127.0.0.1,host.docker.internal}
+      # API 多副本时设 0，让 worker 只跑在 transcriptum-worker 容器里
+      TRANSCRIPTUM_RUN_WORKER: ${TRANSCRIPTUM_RUN_WORKER:-1}
+    volumes:
+      # 单一数据卷：sqlite + 上传音频 + 归一化音频
+      - transcriptum-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    # 让容器能访问宿主上的模型服务（Linux 下需显式映射）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # 可选的独立 worker 容器：docker compose --profile split up -d
+  # 与 API 共享同一个数据卷；SQLite 队列表保证任务只被一个 worker 领取。
+  transcriptum-worker:
+    profiles: ["split"]
+    image: transcriptum:0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["worker"]
+    environment:
+      TRANSCRIPTUM_CONFIG: /app/config.yaml
+      TRANSCRIPTUM_DATA_DIR: /data
+      TRANSCRIPTUM_DB_PATH: /data/transcriptum.db
+      TRANSCRIPTUM_ASR_ADAPTER: ${TRANSCRIPTUM_ASR_ADAPTER:-mock}
+      TRANSCRIPTUM_ASR_BASE_URL: ${TRANSCRIPTUM_ASR_BASE_URL:-http://host.docker.internal:9000}
+      TRANSCRIPTUM_LLM_ADAPTER: ${TRANSCRIPTUM_LLM_ADAPTER:-mock}
+      TRANSCRIPTUM_LLM_BASE_URL: ${TRANSCRIPTUM_LLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      ASR_API_KEY: ${ASR_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      TRANSCRIPTUM_ALLOWED_EGRESS: ${TRANSCRIPTUM_ALLOWED_EGRESS:-localhost,127.0.0.1,host.docker.internal}
+    volumes:
+      - transcriptum-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  transcriptum-data:
+    driver: local

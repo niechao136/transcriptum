@@ -404,8 +404,10 @@ class RecordingService:
         return {"status": "submitted"}
 
     # ---------- 保留期（§10） ----------
-    def purge_expired(self, *, actor: str = "system") -> dict:
-        days = self.cfg.security.audio_retention_days
+    def purge_expired(self, *, actor: str = "system", days: int | None = None) -> dict:
+        if days is not None and days < 0:
+            raise ValueError("保留天数不能为负")
+        days = self.cfg.security.audio_retention_days if days is None else days
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(
             timespec="seconds")
         rows = self.db.all(
