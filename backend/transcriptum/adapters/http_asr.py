@@ -180,8 +180,10 @@ class OpenAiAudioAsr:
         prompt = "、".join(hotwords[:200]) if hotwords else ""
         data = {
             "model": self.model,
-            "response_format": "verbose_json",
-            "timestamp_granularities[]": "segment",
+            # vLLM 的 MOSS 实现不支持 verbose_json（400 BadRequest），
+            # 但 json 格式返回原生 "[ts][Sxx]text" 文本，含时间戳与说话人标签，
+            # 由下方 moss_parser 解析，信息更完整。
+            "response_format": "json",
         }
         if self.max_new_tokens is not None:
             data["max_new_tokens"] = str(self.max_new_tokens)

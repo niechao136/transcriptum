@@ -17,6 +17,11 @@ import httpx
 
 
 def make_wav(seconds: float = 3.0, sr: int = 16000) -> bytes:
+    # 目标机验收：优先用真实语音（模拟纯音无法触发 mock LLM 校对/评估）。
+    import os
+    real = os.environ.get("TRANSCRIPTUM_SMOKE_WAV")
+    if real and Path(real).exists():
+        return Path(real).read_bytes()
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
         w.setnchannels(1)

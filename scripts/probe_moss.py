@@ -81,9 +81,10 @@ def run_sync(client: httpx.Client, args, wav: bytes) -> int:
     print(f"[2] 同步调用 {args.transcriptions_path}")
     payload = {
         "model": args.model,
-        "response_format": "verbose_json",
+        # vLLM 的 MOSS 实现不支持 verbose_json / diarized_json 对纯音输入；
+        # json 返回原生 "[ts][Sxx]text" 文本，正是项目解析器需要的格式。
+        "response_format": "json",
         "max_new_tokens": str(args.max_new_tokens),
-        "timestamp_granularities[]": "segment",
     }
     try:
         r = client.post(

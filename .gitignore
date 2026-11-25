@@ -30,3 +30,6 @@ srv.out.log
 srv.err.log
 probe_tmp.py
 .DS_Store
+
+# 验收用测试音频（本地生成，不入库）
+test_speech.wav
