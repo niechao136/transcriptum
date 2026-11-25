@@ -19,6 +19,11 @@ node_modules/
 frontend/dist/
 *.tsbuildinfo
 
+# 环境变量（可能含密钥；只提交模板）
+.env
+.env.*
+!.env.example
+
 # 日志与临时
 *.log
 srv.out.log

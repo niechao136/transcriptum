@@ -47,6 +47,7 @@ def build_asr(cfg) -> AsrAdapter:
         timeout_s=cfg.asr.timeout_s,
         custom_http=cfg.asr.custom_http,
         adapter_name=cfg.asr.adapter,
+        max_new_tokens=cfg.asr.max_new_tokens,
     )
 
 

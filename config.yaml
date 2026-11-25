@@ -12,7 +12,8 @@ asr:
   api_key_env: ASR_API_KEY
   model: MOSS-Transcribe-Diarize
   hotwords_file: null
-  timeout_s: 60
+  timeout_s: 600                      # 长音频走模型推理，默认 60s 不够
+  max_new_tokens: 65536               # MOSS 官方 cookbook 建议值，防长音频截断
   custom_http:
     submit_path: /v1/jobs
     poll_path: /v1/jobs/{job_id}

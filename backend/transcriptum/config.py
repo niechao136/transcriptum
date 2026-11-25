@@ -74,6 +74,9 @@ class AsrConfig:
     model: str = "moss-transcribe-diarize"
     custom_http: dict[str, Any] = field(default_factory=dict)
     timeout_s: float = 60.0
+    # MOSS 长音频必须调高：官方默认 5120 tokens 会把长录音截断，
+    # cookbook 建议 65536。短音频保持默认即可。
+    max_new_tokens: int | None = None
 
     @property
     def api_key(self) -> str | None:
@@ -183,6 +186,7 @@ class Config:
             "TRANSCRIPTUM_ASR_MODEL": (self.asr, "model", str),
             "TRANSCRIPTUM_ASR_API_KEY_ENV": (self.asr, "api_key_env", str),
             "TRANSCRIPTUM_ASR_TIMEOUT_S": (self.asr, "timeout_s", float),
+            "TRANSCRIPTUM_ASR_MAX_NEW_TOKENS": (self.asr, "max_new_tokens", int),
             "TRANSCRIPTUM_LLM_ADAPTER": (self.llm, "adapter", str),
             "TRANSCRIPTUM_LLM_BASE_URL": (self.llm, "base_url", str),
             "TRANSCRIPTUM_LLM_MODEL": (self.llm, "model", str),

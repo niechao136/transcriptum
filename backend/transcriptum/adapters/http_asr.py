@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -153,11 +154,14 @@ class OpenAiAudioAsr:
         timeout_s: float = 300.0,
         custom_http: dict | None = None,
         adapter_name: str = "openai_audio",
+        max_new_tokens: int | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model or "whisper-1"
         self.timeout_s = timeout_s
+        # MOSS 默认 max_new_tokens=5120，长音频会被截断；由配置显式调高。
+        self.max_new_tokens = max_new_tokens
         self.name = adapter_name
         caps = (custom_http or {}).get("capabilities") or {}
         self.capabilities = Capabilities(
@@ -179,6 +183,8 @@ class OpenAiAudioAsr:
             "response_format": "verbose_json",
             "timestamp_granularities[]": "segment",
         }
+        if self.max_new_tokens is not None:
+            data["max_new_tokens"] = str(self.max_new_tokens)
         if prompt:
             data["prompt"] = prompt
         try:
@@ -201,16 +207,34 @@ class OpenAiAudioAsr:
         payload = resp.json()
         segs = []
         for item in payload.get("segments") or []:
+            # 官方 verbose_json 的 segment.text 形如 "[S01]实际内容"：
+            # 必须把说话人前缀拆出来，否则会混进正文、且对齐层拿不到 speaker。
+            text = str(item.get("text", "")).strip()
+            speaker = None
+            sm = re.match(r"^\[(S\d{2,3}|[A-Z]{1,3})\]\s*", text)
+            if sm:
+                speaker = sm.group(1)
+                text = text[sm.end():].strip()
             segs.append(
                 RawSegment(
                     start_s=float(item.get("start", 0.0)),
                     end_s=float(item.get("end", 0.0)),
-                    text=str(item.get("text", "")).strip(),
+                    text=text,
                     conf=item.get("avg_logprob"),
+                    speaker_label=speaker,
                 )
             )
         if not segs and payload.get("text"):
-            segs = [RawSegment(start_s=0.0, end_s=0.0, text=str(payload["text"]).strip())]
+            # json/text 格式只有全文：交给 MOSS 解析器（含显式 end 时间戳）
+            from .moss_parser import MossParseError, parse_moss_transcript, to_raw_segments
+            try:
+                segs = to_raw_segments(
+                    parse_moss_transcript(str(payload["text"])),
+                    has_speaker=True,
+                )
+            except MossParseError:
+                segs = [RawSegment(start_s=0.0, end_s=0.0,
+                                   text=str(payload["text"]).strip())]
         job_id = f"oai-{abs(hash((str(audio_path), self.model))) % 10**12}"
         self._cache[job_id] = segs
         return job_id
