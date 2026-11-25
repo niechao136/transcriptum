@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "77c29bb2-e9aa-4080-9ea8-23bcd7ddf3db",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "D:\\hub\\transcriptum\\docs\\architecture\\医疗平台-会议处理时序.json",
+  "output": "D:\\hub\\transcriptum\\docs\\architecture\\医疗平台-会议处理时序.html",
+  "specification": {
+    "sha256": "c1c793770f7266c1e1e1bc4cb8629a97db93d540cb4020de760fd3321cf18c26",
+    "bytes": 4044
+  },
+  "artifact": {
+    "sha256": "07be47a8cd3c30f2bfc422294780acd5320a4e4e26aabf3497646b38b871b1b8",
+    "bytes": 766913
+  }
+}

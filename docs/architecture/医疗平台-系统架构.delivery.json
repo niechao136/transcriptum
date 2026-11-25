@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "1090b3ed-b941-454a-9503-f1a0e36ea181",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\hub\\transcriptum\\docs\\architecture\\医疗平台-系统架构.json",
+  "output": "D:\\hub\\transcriptum\\docs\\architecture\\医疗平台-系统架构.html",
+  "specification": {
+    "sha256": "df69ce480d23e27a695a7aade2091ae02b02d35cceb9a64a413ec19b729d3319",
+    "bytes": 9196
+  },
+  "artifact": {
+    "sha256": "d3276d0f90ccadacfc92dd261fa1a5913a21047a75a32809b254bb9d2f240ed0",
+    "bytes": 782934
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "会议处理：上传 → 转写 → 纪要 → 可检索",
+    "output": "医疗平台-会议处理时序.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "临床使用者", "sublabel": "医师 / 护理" },
+    { "id": "api", "type": "backend", "label": "API 层", "sublabel": "鉴权中间件" },
+    { "id": "rbac", "type": "security", "label": "组织与权限", "sublabel": "scope" },
+    { "id": "queue", "type": "messagebus", "label": "任务队列", "sublabel": "Redis" },
+    { "id": "worker", "type": "backend", "label": "Worker", "sublabel": "状态机" },
+    { "id": "moss", "type": "backend", "label": "MOSS ASR", "sublabel": "GPU" },
+    { "id": "llm", "type": "backend", "label": "LLM", "sublabel": "纪要/校对" },
+    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "+ pgvector" }
+  ],
+  "segments": [
+    { "from": 150, "to": 318, "label": "上传与入队" },
+    { "from": 336, "to": 640, "label": "异步转写与校对" },
+    { "from": 658, "to": 860, "label": "纪要 + 定稿" },
+    { "from": 878, "to": 980, "label": "检索" }
+  ],
+  "messages": [
+    { "from": "user", "to": "api", "y": 180, "label": "上传录音", "variant": "emphasis" },
+    { "from": "api", "to": "rbac", "y": 220, "label": "inScope(unit)", "variant": "security" },
+    { "from": "rbac", "to": "api", "y": 260, "label": "允许/拒绝", "variant": "return" },
+    { "from": "api", "to": "db", "y": 300, "label": "meeting=排隊中", "variant": "default" },
+    { "from": "api", "to": "queue", "y": 340, "label": "入队", "variant": "emphasis" },
+    { "from": "api", "to": "user", "y": 380, "label": "202 + id", "variant": "return" },
+
+    { "from": "queue", "to": "worker", "y": 438, "label": "领取", "variant": "emphasis" },
+    { "from": "worker", "to": "db", "y": 478, "label": "status=處理中", "variant": "default" },
+    { "from": "worker", "to": "moss", "y": 518, "label": "转写", "variant": "emphasis" },
+    { "from": "moss", "to": "worker", "y": 558, "label": "带 [Sxx] 全文", "variant": "return" },
+    { "from": "worker", "to": "db", "y": 598, "label": "存句子+说话人", "variant": "emphasis" },
+    { "from": "worker", "to": "llm", "y": 638, "label": "逐句校对", "variant": "default" },
+    { "from": "llm", "to": "worker", "y": 678, "label": "ai_edits", "variant": "return" },
+    { "from": "worker", "to": "db", "y": 718, "label": "status=草稿", "variant": "default" },
+
+    { "from": "api", "to": "llm", "y": 776, "label": "按 tpl 生成", "variant": "emphasis" },
+    { "from": "llm", "to": "api", "y": 816, "label": "items[]", "variant": "return" },
+    { "from": "api", "to": "db", "y": 856, "label": "存 (seg,key) 依据链", "variant": "emphasis" },
+    { "from": "api", "to": "db", "y": 896, "label": "定稿+first_final", "variant": "emphasis" },
+
+    { "from": "user", "to": "api", "y": 946, "label": "提问", "variant": "default" },
+    { "from": "api", "to": "db", "y": 986, "label": "仅已定稿∧范围内检索", "variant": "security" },
+    { "from": "db", "to": "api", "y": 1026, "label": "命中+出处", "variant": "return" },
+    { "from": "api", "to": "user", "y": 1066, "label": "≤4 条带出处", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "api", "from": 174, "to": 388, "type": "backend" },
+    { "participant": "rbac", "from": 212, "to": 268, "type": "security" },
+    { "participant": "queue", "from": 332, "to": 446, "type": "messagebus" },
+    { "participant": "worker", "from": 430, "to": 726, "type": "backend" },
+    { "participant": "moss", "from": 510, "to": 566, "type": "backend" },
+    { "participant": "api", "from": 768, "to": 904, "type": "backend" },
+    { "participant": "llm", "from": 770, "to": 824, "type": "backend" },
+    { "participant": "api", "from": 938, "to": 1074, "type": "backend" }
+  ]
+}

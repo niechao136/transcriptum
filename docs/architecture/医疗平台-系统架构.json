@@ -1,0 +1,450 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "医疗平台 · 系统架构",
+    "output": "医疗平台-系统架构.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "院内用户浏览器",
+      "sublabel": "医师 / 护理 / 管理者",
+      "pos": [
+        40,
+        70
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "nginx",
+      "type": "cloud",
+      "label": "Nginx",
+      "sublabel": "HTTPS 终止 + 静态资源",
+      "pos": [
+        250,
+        70
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "spa",
+      "type": "frontend",
+      "label": "React SPA",
+      "sublabel": "13 视图 · 权限仅控制显示",
+      "pos": [
+        460,
+        70
+      ],
+      "size": [
+        160,
+        62
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "API 层",
+      "sublabel": "FastAPI · 统一鉴权中间件",
+      "pos": [
+        460,
+        190
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "Ctx(user, role, scope, ver)"
+    },
+    {
+      "id": "meeting",
+      "type": "backend",
+      "label": "会议域",
+      "sublabel": "上传/状态机/定稿",
+      "pos": [
+        40,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "rbac",
+      "type": "security",
+      "label": "组织与权限",
+      "sublabel": "scope / can / kbRight",
+      "pos": [
+        205,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "minutes",
+      "type": "backend",
+      "label": "纪要域",
+      "sublabel": "字段模板 + 依据链",
+      "pos": [
+        370,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "rag",
+      "type": "backend",
+      "label": "知识库 RAG",
+      "sublabel": "分块 / 索引 / 重新处理",
+      "pos": [
+        535,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "forms",
+      "type": "backend",
+      "label": "表单域",
+      "sublabel": "模板 / 填写 / 归属",
+      "pos": [
+        700,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "qa",
+      "type": "backend",
+      "label": "检索问答",
+      "sublabel": "仅已定稿 · 带出处",
+      "pos": [
+        865,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "任务队列",
+      "sublabel": "Redis · FIFO + 重试",
+      "pos": [
+        40,
+        450
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Worker",
+      "sublabel": "转写/校对/纪要/索引",
+      "pos": [
+        235,
+        450
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "moss",
+      "type": "backend",
+      "label": "MOSS ASR",
+      "sublabel": "vLLM :9000 · RTF 0.197",
+      "pos": [
+        460,
+        450
+      ],
+      "size": [
+        160,
+        58
+      ],
+      "tag": "本地 GPU · 音频不出内网"
+    },
+    {
+      "id": "llm",
+      "type": "backend",
+      "label": "LLM",
+      "sublabel": "纪要 / 校对 / RAG",
+      "pos": [
+        660,
+        450
+      ],
+      "size": [
+        150,
+        58
+      ],
+      "tag": "内网推理"
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "+ pgvector 向量检索",
+      "pos": [
+        40,
+        590
+      ],
+      "size": [
+        150,
+        58
+      ]
+    },
+    {
+      "id": "minio",
+      "type": "database",
+      "label": "MinIO",
+      "sublabel": "音频 + 原始档",
+      "pos": [
+        235,
+        590
+      ],
+      "size": [
+        150,
+        58
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "会话 / 队列 / scope 缓存",
+      "pos": [
+        430,
+        590
+      ],
+      "size": [
+        150,
+        58
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "医院内网（音频与文本不出公网）",
+      "wraps": [
+        "spa",
+        "api",
+        "meeting",
+        "rbac",
+        "minutes",
+        "rag",
+        "forms",
+        "qa",
+        "queue",
+        "worker",
+        "moss",
+        "llm",
+        "pg",
+        "minio",
+        "redis"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "服务端强制鉴权边界",
+      "wraps": [
+        "api",
+        "rbac"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-nginx",
+      "from": "browser",
+      "to": "nginx",
+      "label": "HTTPS"
+    },
+    {
+      "id": "nginx-spa",
+      "from": "nginx",
+      "to": "spa",
+      "label": "静态资源"
+    },
+    {
+      "id": "spa-api",
+      "from": "spa",
+      "to": "api",
+      "label": "/api",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-rbac",
+      "from": "api",
+      "to": "rbac",
+      "label": "每请求校验",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "api-meeting",
+      "from": "api",
+      "to": "meeting"
+    },
+    {
+      "id": "api-minutes",
+      "from": "api",
+      "to": "minutes"
+    },
+    {
+      "id": "api-rag",
+      "from": "api",
+      "to": "rag"
+    },
+    {
+      "id": "api-forms",
+      "from": "api",
+      "to": "forms"
+    },
+    {
+      "id": "api-qa",
+      "from": "api",
+      "to": "qa"
+    },
+    {
+      "id": "meeting-queue",
+      "from": "meeting",
+      "to": "queue",
+      "label": "入队",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "queue-worker",
+      "from": "queue",
+      "to": "worker",
+      "label": "领取"
+    },
+    {
+      "id": "worker-moss",
+      "from": "worker",
+      "to": "moss",
+      "label": "转写",
+      "variant": "emphasis"
+    },
+    {
+      "id": "worker-llm",
+      "from": "worker",
+      "to": "llm",
+      "label": "纪要/校对"
+    },
+    {
+      "id": "minutes-llm",
+      "from": "minutes",
+      "to": "llm",
+      "label": "生成",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 30
+    },
+    {
+      "id": "worker-pg",
+      "from": "worker",
+      "to": "pg",
+      "label": "写入",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "worker-minio",
+      "from": "worker",
+      "to": "minio",
+      "label": "音频落盘",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "worker-redis",
+      "from": "worker",
+      "to": "redis",
+      "label": "队列/缓存",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "接入与前端",
+      "items": [
+        "Nginx 终止 HTTPS，托管 SPA 静态资源",
+        "React 13 视图；权限只控制「显示与否」，真正的判定在服务端",
+        "会议详情页承担逐句校对、说话人绑定、跳播与定稿"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "API 与领域层",
+      "items": [
+        "统一鉴权中间件构造 Ctx(user, role, scope, ver)",
+        "领域层为纯业务规则，不碰 IO，便于单测",
+        "权限/绑定变更 → ver+1 → 该用户全端强制登出"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "任务与推理",
+      "items": [
+        "Redis 队列 + Worker：转写/校对/纪要/索引全部异步",
+        "MOSS 实测 RTF 0.197（42 分钟音频约 8.3 分钟）",
+        "推理为独立服务，应用扩容不拖 GPU；推理不可用时暂停取任务"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "数据与安全边界",
+      "items": [
+        "PostgreSQL + pgvector：检索先按 scope 过滤再排序，绝不先全局后过滤",
+        "MinIO 存音频；录音删除只删 audio_ref，句子与纪要永久保留",
+        "审计表级禁改删；登录失败也记"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "本系统最独特之处：依据链",
+      "items": [
+        "纪要每项绑定 (seg_id, key)，如「議題摘要」→ 句 0 必须仍含「跌倒」",
+        "句子被删改后重新生成，该结论自动消失",
+        "产品灵魂：没有依据的结论不该存在"
+      ]
+    }
+  ]
+}
