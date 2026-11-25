@@ -22,10 +22,17 @@ def ffmpeg_available() -> bool:
 
 
 def probe_duration_ms(audio_path: Path) -> int:
-    """用 ffprobe 取时长；失败返回 0（不阻断主流程）。"""
+    """取音频时长（毫秒）；失败返回 0（不阻断主流程）。
+
+    优先 ffprobe；没有 ffprobe 时对 WAV 直接读头（标准库 wave，精确到采样），
+    因为归一化产物一定是 16k 单声道 PCM WAV。这样目标机缺 ffprobe 时也能
+    得到真实时长，不必依赖 ASR 时间戳（后者在短音频/纯音上会幻觉出
+    远超文件长度的值）。
+    """
+    audio_path = Path(audio_path)
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
-        return 0
+        return _wav_duration_ms(audio_path)
     try:
         out = subprocess.run(
             [
@@ -37,6 +44,16 @@ def probe_duration_ms(audio_path: Path) -> int:
         data = json.loads(out.stdout)
         return int(float(data["format"]["duration"]) * 1000)
     except (subprocess.SubprocessError, KeyError, ValueError, json.JSONDecodeError):
+        return _wav_duration_ms(audio_path)
+
+
+def _wav_duration_ms(path: Path) -> int:
+    """从 WAV 头算时长；非 WAV 或损坏文件返回 0。"""
+    import wave
+    try:
+        with wave.open(str(path), "rb") as w:
+            return int(w.getnframes() / w.getframerate() * 1000)
+    except (OSError, EOFError, ValueError, wave.Error):
         return 0
 
 
