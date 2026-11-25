@@ -12,7 +12,10 @@ import urllib.request
 
 URL = ("https://hf-mirror.com/OpenMOSS-Team/MOSS-Transcribe-Diarize/"
        "resolve/main/model-00000-of-00001.safetensors")
-TARGET = "/home/nechao/models/MOSS-Transcribe-Diarize/model-00000-of-00001.safetensors"
+# 默认路径保留兼容当前部署；新机器可通过 MOSS_MODEL_DIR 覆盖。
+DEFAULT_MODEL_DIR = os.path.join(os.path.expanduser("~"), "models", "MOSS-Transcribe-Diarize")
+MODEL_DIR = os.environ.get("MOSS_MODEL_DIR", DEFAULT_MODEL_DIR)
+TARGET = os.path.join(MODEL_DIR, "model-00000-of-00001.safetensors")
 EXPECTED_SIZE = 1817113576
 EXPECTED_SHA = "9a0ceb4ab7330357db3ff583dba8d83625d5b733b00e1d55d6970e11b07026c4"
 PARTIAL = TARGET + ".partial"
@@ -58,8 +61,59 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+# vLLM 加载模型必需的配套文件（配置/分词器/自定义 modeling 代码）。
+# 它们很小（合计约 15MB），但缺失时服务无法启动。
+SIDE_FILES = [
+    "config.json",
+    "configuration_moss_transcribe_diarize.py",
+    "generation_config.json",
+    "modeling_moss_transcribe_diarize.py",
+    "processing_moss_transcribe_diarize.py",
+    "processor_config.json",
+    "preprocessor_config.json",
+    "added_tokens.json",
+    "chat_template.jinja",
+    "merges.txt",
+    "vocab.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "special_tokens_map.json",
+    "model.safetensors.index.json",
+]
+
+
+def download_side_files():
+    """下载模型运行所需的配套文件；已存在且非空则跳过。"""
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    for name in SIDE_FILES:
+        dst = os.path.join(MODEL_DIR, name)
+        if os.path.exists(dst) and os.path.getsize(dst) > 0:
+            continue
+        url = ("https://hf-mirror.com/OpenMOSS-Team/"
+               "MOSS-Transcribe-Diarize/resolve/main/" + name)
+        tmp = dst + ".tmp"
+        for attempt in range(5):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "moss-deploy/1.0"})
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    data = r.read()
+                if not data:
+                    raise RuntimeError("empty response")
+                with open(tmp, "wb") as f:
+                    f.write(data)
+                os.replace(tmp, dst)
+                log(f"side file: {name} ({len(data)} bytes)")
+                break
+            except Exception as e:
+                log(f"side file {name} retry {attempt+1}/5: {e}")
+                time.sleep(2 ** attempt)
+        else:
+            raise RuntimeError(f"failed to download {name}")
+
+
 def main():
     force_ipv4()
+    download_side_files()
     # Reuse existing hf-xet partial if present and smaller than target.
     if not os.path.exists(PARTIAL):
         xet = None
