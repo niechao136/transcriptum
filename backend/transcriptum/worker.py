@@ -138,6 +138,7 @@ def _run_transcribe(deps: WorkerDeps, job: dict) -> None:
     if duration_ms:
         with db.tx():
             db.exec("UPDATE recording SET duration_ms=? WHERE id=?", (duration_ms, rec_id))
+    # ffprobe 未安装时 duration_ms=0，拿到 ASR 句子后按最后一句 end 回退（见下方）
 
     hotwords = _glossary_terms(db, rec_id)
     job_id = deps.asr.submit(wav, hotwords)
@@ -185,6 +186,14 @@ def _run_transcribe(deps: WorkerDeps, job: dict) -> None:
             )
             if a.review_reason and a.needs_review:
                 warnings.append(f"seq{seq}: {a.review_reason}")
+
+        # ffprobe 缺失时 duration_ms 为 0；用最后一句的 end 回退。
+        # 音频末尾的静音会被截掉，但总比列表页显示 0:00 强。
+        if not duration_ms:
+            fallback = max((int(s.end_s * 1000) for s in segments if s.end_s > 0), default=0)
+            if fallback > 0:
+                duration_ms = fallback
+                db.exec("UPDATE recording SET duration_ms=? WHERE id=?", (duration_ms, rec_id))
 
         db.exec(
             "UPDATE recording SET status='transcribed', duration_ms=?, asr_adapter=?,"
