@@ -91,6 +91,7 @@ case "${1:-}" in
       --restart unless-stopped \
       --shm-size 8g \
       -p "127.0.0.1:${PORT}:8000" \
+      -p "127.0.0.1:9090:8000" \
       -v "$MODEL_DIR:/models/MOSS-Transcribe-Diarize:ro" \
       "${DOCKER_ARGS[@]}" \
       -e HF_HUB_OFFLINE=1 \

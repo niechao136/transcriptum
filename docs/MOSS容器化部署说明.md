@@ -104,11 +104,48 @@ asr:
 
 ## 当前状态
 
-已创建并静态验证（GPU 已被释放，未实际启动容器）：
+已完整实测通过（容器化部署已在本机跑通）：
 
 - `scripts/moss-container/setup.sh`
 - `scripts/moss-container/run-moss.sh`
 - `scripts/download_moss_shard.py`（新增 15 个配套文件下载）
+
+## API 文档访问地址
+
+容器同时绑定两个端口，均为 `127.0.0.1` → 容器 `8000`：
+
+| 用途 | 端口 | 说明 |
+|---|---|---|
+| 应用调用 | 9010 | Transcriptum 的 `asr.base_url` 指向此处 |
+| 文档/调试 | 9090 | 专供浏览器访问 Swagger，避开 Windows 侧端口冲突 |
+
+### 为什么要单独一个 9090
+
+Windows 上 **Logitech G Hub（`lghub_agent.exe`）占用了 9010**，浏览器打开 `127.0.0.1:9010` 会打到 G Hub 并返回 `426 Upgrade Required`，而不是 vLLM。因此容器额外映射 `9090`，Windows 浏览器用这个端口即可。
+
+### 本机（Windows 浏览器）
+
+- Swagger UI：http://127.0.0.1:9090/docs
+- ReDoc：http://127.0.0.1:9090/redoc
+- OpenAPI：http://127.0.0.1:9090/openapi.json
+
+### 公网
+
+- Swagger UI：http://139.224.13.57:8082/docs
+- ReDoc：http://139.224.13.57:8082/redoc
+- OpenAPI：http://139.224.13.57:8082/openapi.json
+
+链路：`8082` nginx → 隧道 `127.0.0.1:18082` → WSL `9090` → 容器 `8000`。
+
+> 备用入口：`http://139.224.13.57:8081/moss/docs`（复用已放行端口，无需开安全组）。
+> 但该入口**只能浏览，不能用 "Try it out"** —— OpenAPI 里的 path 是根相对路径，页面从 `/moss/` 发起调用会打到 Transcriptum 而非 MOSS。要交互调试请用 8082。
+
+### 云端相关 systemd 单元
+
+| 单元 | 作用 |
+|---|---|
+| `moss-tunnel.service` | `18081` → WSL `8080`（Transcriptum 应用） |
+| `moss-docs-tunnel.service` | `18082` → WSL `9090`（MOSS 文档/API） |
 
 ## 实测验证记录（2026-11-26）
 
